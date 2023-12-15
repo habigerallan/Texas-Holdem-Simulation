@@ -1,0 +1,64 @@
+# Compiled object files
+*.o
+*.out
+*.obj
+*.exe
+
+# Compiled dynamic libraries (shared libraries)
+*.so
+*.dylib
+*.dll
+
+# Compiled static libraries
+*.a
+*.lib
+
+# CMake build directory
+build/
+
+# Visual Studio Code configuration files
+.vscode/
+
+# User-specific settings and environment files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Local directory used for debugging (Windows)
+ipch/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+
+# Generated source files and executables
+CMakeScripts/
+CMakeScripts/ReRunCMake.cmake
+
+# macOS system files
+.DS_Store
+
+# Compiled Python files
+__pycache__/
+*.pyc
+
+# Editor-specific temporary/backup files
+*~
+
+# Ignore the build/ directory and all its contents
+build/
+
+# Ignore the bin/ directory and all its contents
+bin/
+
+# Ignore the lib/ directory and all its contents
+lib/
+
+# Ignore Visual Studio Code settings folder
+.vscode/
+
+# Ignore the .vscode-server/ directory and all its contents
+.vscode-server/
