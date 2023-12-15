@@ -11,7 +11,7 @@
 std::map<int, std::map<int, int>> globalResults; // To store win condition counts for each hand
 std::mutex globalMutex;
 
-const int totalIterations = 1000000;
+const int totalIterations = 10000000;
 int numThreads = 3;
 int currentIterations = 0;
 
