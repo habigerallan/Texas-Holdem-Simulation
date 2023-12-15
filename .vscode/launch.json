@@ -9,7 +9,7 @@
       "stopAtEntry": false,
       "externalConsole": true,
       "cwd": "c:/Users/habig/Documents/GitHub/Texas-Holdem-Simulation",
-      "program": "c:/Users/habig/Documents/GitHub/Texas-Holdem-Simulation/build/Debug/outDebug",
+      "program": "c:/Users/habig/Documents/GitHub/Texas-Holdem-Simulation/build/Release/outRelease",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [
