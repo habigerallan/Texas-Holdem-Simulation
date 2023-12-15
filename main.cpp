@@ -11,28 +11,51 @@
 std::map<int, std::map<int, int>> globalResults; // To store win condition counts for each hand
 std::mutex globalMutex;
 
+const int totalIterations = 1000000;
+int numThreads = 3;
+int currentIterations = 0;
+
 void ProcessResults(const GameResult& result) {
-    // Lock the mutex while updating the global results
     std::lock_guard<std::mutex> lock(globalMutex);
-
+	
     int handKey = result.hand.cards[0].suit * 1000000 + result.hand.cards[0].rank * 10000 + result.hand.cards[1].suit * 100 + result.hand.cards[1].rank;
-
+	
     globalResults[handKey][result.win_condition]++;
 }
 
-const int totalIterations = 5000000;
-const int numThreads = 4;
-// Thread function
+void progressThread() {
+    while (currentIterations < totalIterations) {
+        // Calculate progress and display the progress bar here
+        double progress = static_cast<double>(currentIterations) / totalIterations;
+        int barWidth = 50;
+        int progressBar = static_cast<int>(progress * barWidth);
+        std::cout << "Progress: [";
+        for (int j = 0; j < progressBar; ++j) {
+            std::cout << "=";
+        }
+        for (int j = progressBar; j < barWidth; ++j) {
+            std::cout << " ";
+        }
+        std::cout << "] " << std::fixed << std::setprecision(1) << (progress * 100.0) << "%" << std::flush; // Add std::flush
+        std::cout << "\r"; // Move cursor to the beginning of the line
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+}
+
+
 void thread_function() {
     for (int i = 0; i < totalIterations / numThreads; ++i) {
         TexasHoldEm game;
         GameResult result = game.play();
         ProcessResults(result);
+		currentIterations++;
     }
 }
 
 int main() {
 	std::vector<std::thread> threads;
+
+    std::thread progressbarthread(progressThread);
 
 	auto startTime = std::chrono::high_resolution_clock::now();
 
@@ -44,11 +67,18 @@ int main() {
 		th.join();
 	}
 
+    TexasHoldEm game;
+    while (currentIterations < totalIterations) {
+        GameResult result = game.play();
+        ProcessResults(result);
+		currentIterations++;
+	}
+
 	auto endTime = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
 	double durationInSeconds = static_cast<double>(duration.count()) / 1000.0;
-	std::cout << "Execution Time for " << numThreads << " threads: " << durationInSeconds << " seconds" << std::endl;	
-    
+
+    progressbarthread.join();
 
     std::lock_guard<std::mutex> lock(globalMutex);
 
@@ -73,6 +103,19 @@ int main() {
 	}
 
     outputFile.close(); // Close the output file
+
+	double progress = static_cast<double>(currentIterations) / totalIterations;
+    int barWidth = 50;
+    int progressBar = static_cast<int>(progress * barWidth);
+
+    std::cout << "Progress: [";
+    for (int j = 0; j < progressBar; ++j) {
+        std::cout << "=";
+    }
+    for (int j = progressBar; j < barWidth; ++j) {
+        std::cout << " ";
+    }
+    std::cout << "] " << std::fixed << std::setprecision(1) << (progress * 100.0) << "%" << std::endl << std::flush; // Add std::flush
 
     std::cout << "Execution Time: " << durationInSeconds << " seconds" << std::endl;
     double iterationsPerSecond = static_cast<double>(totalIterations) / durationInSeconds;
