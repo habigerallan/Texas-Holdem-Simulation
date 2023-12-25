@@ -13,8 +13,9 @@
 *.a
 *.lib
 
-# CMake build directory
+# build directory
 build/
+output/
 
 # Visual Studio Code configuration files
 .vscode/
