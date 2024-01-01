@@ -1,4 +1,4 @@
-#include "TexasHoldEm.h"
+#include "texas_hold_em.h"
 
 void initialize_game_sets(TexasHoldEm* game) {
     Card hc1 = game->hand.cards[0];

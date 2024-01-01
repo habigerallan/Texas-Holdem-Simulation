@@ -21,11 +21,11 @@ all: $(TARGET)
 
 # Link the target executable
 $(TARGET): $(OBJECTS)
-	$(CC) $(CFLAGS) $^ -o $@ -lpthread
+	$(CC) $(CFLAGS) $^ -g -o $@ -lpthread
 
 # Compile the source files into object files
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -g -o $@
 
 # Clean target
 clean:

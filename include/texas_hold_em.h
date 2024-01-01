@@ -15,16 +15,6 @@
 #define STRAIGHTFLUSH 9
 #define ROYALFLUSH 10
 
-// Define a structure for a player's hand
-typedef struct {
-    Card cards[2];
-} Hand;
-
-// Define a structure for the community cards on the table
-typedef struct {
-    Card cards[5];
-} Table;
-
 // Define a structure to store the result of a game
 typedef struct {
     Hand hand;

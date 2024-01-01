@@ -31,6 +31,16 @@ typedef struct {
     int rank;
 } Card;
 
+// Define a structure for a player's hand
+typedef struct {
+    Card cards[2];
+} Hand;
+
+// Define a structure for the community cards on the table
+typedef struct {
+    Card cards[5];
+} Table;
+
 void initialize_random();
 Card deal_card();
 
