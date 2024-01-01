@@ -30,6 +30,6 @@ void free_card_data(HandMap card_data);
 NodeIndex hand_to_index(Hand hand);
 Hand index_to_hand(NodeIndex index);
 
-void add_game_result(Handmap card_data, GameResult game_result);
+void add_game_result(HandMap card_data, GameResult game_result);
 
 #endif

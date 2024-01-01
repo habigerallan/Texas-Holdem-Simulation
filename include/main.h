@@ -12,9 +12,15 @@ typedef struct {
 	int threads_per_process;
 } ThreadArguments;
 
-void workerThreadFunction(GameResult *results_buffer, int iterations_to_complete);
-void pipeThreadFunction(GameResult *results_buffer, int write_end);
+typedef struct {
+	GameResult *results_buffer;
+	int worker_iterations;
+	int offset;
+	pthread_mutex_t mutex;
+} workerThreadArguments;
+
+void *workerThreadFunction(void *args);
 void subprocessMainFunction(GameResult *results_buffer, int iterations_to_complete, int threads_per_process, int write_end);
-void mainThreadFunction(void *args);
+void *mainThreadFunction(void *args);
 
 #endif
