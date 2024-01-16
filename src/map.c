@@ -99,3 +99,15 @@ void add_game_result(HandMap hand_map, GameResult game_result) {
     current_node.hand_count++;
     pthread_mutex_unlock(&current_node.map_mutex);
 }
+
+Node get_game_result(HandMap hand_map, NodeIndex index) {
+    Node **card_data = hand_map.card_data;
+    int index1 = index.card1_index;
+    int index2 = index.card2_index;
+
+    pthread_mutex_lock(&card_data[index1][index2].map_mutex);
+    Node result = card_data[index1][index2];
+    pthread_mutex_unlock(&card_data[index1][index2].map_mutex);
+
+    return result;
+}

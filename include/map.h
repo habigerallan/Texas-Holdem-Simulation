@@ -25,11 +25,12 @@ typedef struct {
 } HandMap;
 
 HandMap init_card_data();
-void free_card_data(HandMap card_data);
+void free_card_data(HandMap hand_map);
 
 NodeIndex hand_to_index(Hand hand);
 Hand index_to_hand(NodeIndex index);
 
-void add_game_result(HandMap card_data, GameResult game_result);
+void add_game_result(HandMap hand_map, GameResult game_result);
+Node get_game_result(HandMap hand_map, NodeIndex index);
 
 #endif

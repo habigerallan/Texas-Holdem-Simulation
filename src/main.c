@@ -1,153 +1,75 @@
 #include "main.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <pthread.h>
+#define PROGRESS_BAR_WIDTH 50 // Width of the progress bar in characters
 
-void *workerThreadFunction(void *args) {
-	workerThreadArguments *t_args = (workerThreadArguments *) args;
+void* progressbar(void *args) {
+    SharedData *shared_data = (SharedData *)args;
 
-    GameResult *results_buffer = t_args->results_buffer;
-    int worker_iterations = t_args->worker_iterations;
-	pthread_mutex_t mutex = t_args->mutex;
-	int offset = t_args->offset;
+    // Initial print out of the progress bar
+    printf("[");
+    for (int i = 0; i < PROGRESS_BAR_WIDTH; i++) {
+        printf(" ");
+    }
+    printf("]\r["); // Carriage return to print over the same line
 
-	TexasHoldEm game;
-    for (int i = 0; i < worker_iterations; i++) {
-		GameResult result = TexasHoldEm_play(&game);
+    while (atomic_load(&shared_data->current_iterations) < atomic_load(&shared_data->total_iterations)) {
+        int current_progress = atomic_load(&shared_data->current_iterations);
+        int total = atomic_load(&shared_data->total_iterations);
+        int progress_percentage = (current_progress * 100) / total;
+        int pos = (progress_percentage * PROGRESS_BAR_WIDTH) / 100;
 
-		pthread_mutex_lock(&mutex);
-        results_buffer[i + offset] = result;
-        pthread_mutex_unlock(&mutex);
-	}
+        // Update the progress bar
+        for (int i = 0; i < pos; i++) {
+            printf("=");
+        }
+        for (int i = pos; i < PROGRESS_BAR_WIDTH; i++) {
+            printf(" ");
+        }
+        printf("] %d%%\r", progress_percentage); // Carriage return to print over the same line
+        fflush(stdout); // Flush the output buffer to ensure it prints immediately
 
-	return NULL;
+        // Sleep for a short interval so you don't update too frequently
+        usleep(100000); // Sleep for 100 milliseconds
+    }
+
+    // Final print out to ensure the progress bar shows as complete
+    printf("[");
+    for (int i = 0; i < PROGRESS_BAR_WIDTH; i++) {
+        printf("=");
+    }
+    printf("] 100%%\n"); // Newline at the end
+
+    return NULL;
 }
 
-void subprocessMainFunction(GameResult *results_buffer, int iterations_to_complete, int threads_per_process, int write_end) {
-	workerThreadArguments *args = malloc(sizeof(workerThreadArguments));
-	args->results_buffer = results_buffer;
-	args->worker_iterations = iterations_to_complete / threads_per_process;
-    pthread_mutex_init(&args->mutex, NULL);
-
-	int total_offset = 0;
-	pthread_t threads[threads_per_process];
-    for (int i = 0; i < threads_per_process; i++) {
-		if (i+1 == threads_per_process) {
-			args->worker_iterations = iterations_to_complete % threads_per_process;
-		}
-
-		args->offset = total_offset;
-		total_offset += args->worker_iterations;
-
-        if (pthread_create(&threads[i], NULL, workerThreadFunction, (void *) args) != 0) {
-            perror("Failed to create worker thread");
-			free(args);
-            exit(EXIT_FAILURE);
-        }
-    }
-	
-    // Wait for worker threads to finish
-    for (int i = 0; i < threads_per_process - 1; i++) {
-        pthread_join(threads[i], NULL);
-    }
-    
-	// Now write into the pipe
-    for (int i = 0; i < iterations_to_complete; i++) {
-        if (write(write_end, &results_buffer[i], sizeof(GameResult)) == -1) {
-            perror("Error writing to pipe");
-			free(args);
-            exit(EXIT_FAILURE);
-        }
-    }
-
-	free(args);
-	return;
-}
-
-void *mainThreadFunction(void *args) {
-    ThreadArguments *t_args = (ThreadArguments *) args;
-
-    HandMap hand_map = t_args->hand_map;
-    int iterations = t_args->iterations;
+void* ThreadFunction(void *args) {
+    ThreadArgs *t_args = (ThreadArgs *) args;
     int processes_count = t_args->processes_count;
-    int threads_per_process = t_args->threads_per_process;
+    int threads_per_process = t_args->threads_per_process; // May not be needed
+    int i;
 
-    pid_t pid;
-    int max_fd = 0;
-    fd_set readfds;
-    FD_ZERO(&readfds);
+    for (i = 0; i < processes_count; ++i) {
+        pid_t pid = fork();
 
-    int pipefds[processes_count][2];  // Array to store pipes for each subprocess
-
-    for (int i = 0; i < processes_count; i++) {
-        if (pipe(pipefds[i]) == -1) {
-            perror("pipe");
+        // Child process
+        if (pid == 0) {
+            char threads_str[16];
+            snprintf(threads_str, sizeof(threads_str), "%d", threads_per_process);
+            execl("./build/worker", "worker", threads_str, (char *) NULL);
+            perror("execl");
             exit(EXIT_FAILURE);
-        }
-
-        pid = fork();
-        if (pid == -1) {
+        } else if (pid < 0) {
+            // Handle error in fork
             perror("fork");
             exit(EXIT_FAILURE);
         }
-
-        if (pid == 0) {  // Child process
-            close(pipefds[i][0]);  // Close the read end of the pipe
-
-			GameResult *results_buffer = malloc(iterations * sizeof(GameResult));
-			if (!results_buffer) {
-				perror("Failed to allocate memory for results");
-				exit(1);
-			}
-
-			subprocessMainFunction(results_buffer, iterations, threads_per_process, pipefds[i][1]);
-
-            close(pipefds[i][1]);  // Close the write end of the pipe
-			free(results_buffer);
-            exit(EXIT_SUCCESS);
-        } else {  // Parent process
-            close(pipefds[i][1]);  // Close the write end of the pipe
-
-            if (pipefds[i][0] > max_fd) {
-                max_fd = pipefds[i][0];
-            }
-
-            FD_SET(pipefds[i][0], &readfds);  // Add the read end of the pipe to the readfds set
-        }
     }
 
-    int open_fd_count = processes_count;
+    // Parent process waits for all child processes to finish
+    for (i = 0; i < processes_count; ++i) {
+        wait(NULL);
+    }
 
-	while (open_fd_count > 0) {
-		fd_set tempfds = readfds;
-		int activity = select(max_fd + 1, &tempfds, NULL, NULL, NULL);
-
-		if (activity < 0) {
-			perror("select");
-			exit(EXIT_FAILURE);
-		}
-
-		for (int i = 0; i < processes_count; i++) {
-			if (FD_ISSET(pipefds[i][0], &tempfds)) {
-				GameResult result;
-				ssize_t readBytes = read(pipefds[i][0], &result, sizeof(GameResult));
-				if (readBytes > 0) {
-					add_game_result(hand_map, result);
-				} else if (readBytes == 0) {
-					close(pipefds[i][0]);  // Close the pipe if no more data
-					FD_CLR(pipefds[i][0], &readfds);  // Remove from set
-					open_fd_count--;  // Decrement the open file descriptor count
-				}
-			}
-		}
-	}
-
-    // Wait for all child processes to finish
-    while (wait(NULL) > 0) {
-    // Loop will continue until there are no more child processes
-	}
-	
-	return NULL;
+    return NULL;
 }
 
 int main(int argc, char *argv[]) {
@@ -165,34 +87,50 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-	ThreadArguments args;
-	args.hand_map = init_card_data();
-	args.iterations = total_iterations / total_processes;
+	ThreadArgs args;
+	SharedData *shared_data;
+	
+	int shm_fd = shm_open("/mySharedMemory", O_CREAT | O_RDWR, 0666);
+    ftruncate(shm_fd, sizeof(SharedData));
+    shared_data = mmap(0, sizeof(SharedData), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+	
+	shared_data->hand_map = init_card_data();
+    shared_data->total_iterations = total_iterations;
+    shared_data->current_iterations = 0;
+
 	args.processes_count = total_processes / threads_per_process;
 	args.threads_per_process = threads_per_process;
 
 	pthread_t threads[threads_per_process];
     for (int i = 0; i < threads_per_process; i++) {
 		if (i+1 == threads_per_process) {
-			args.iterations += total_iterations % total_processes;
 			args.processes_count += total_processes % threads_per_process;
 		}
 
-		if (pthread_create(&threads[i], NULL, mainThreadFunction, (void *) &args) != 0) {
+		if (pthread_create(&threads[i], NULL, ThreadFunction, (void *) &args) != 0) {
 			perror("Failed to create thread");
 			exit(1);
 		}
     }
 
+	pthread_t threadsasd;
+	if (pthread_create(&threadsasd, NULL, progressbar, (void *) &shared_data) != 0) {
+		perror("Failed to create thread");
+		exit(1);
+	}
+
 	for (int i = 0; i < threads_per_process; i++) {
         pthread_join(threads[i], NULL);
     }
 
+	pthread_join(threadsasd, NULL);
+
 	// read handmap into some sort of file (maybe json **RESEARCH** )
 
 	printf("Complete!");
-
-	free_card_data(args.hand_map);
+    munmap(shared_data, sizeof(SharedData));
+    close(shm_fd);
+    shm_unlink("/mySharedMemory");
 
 	return 0;
 }
