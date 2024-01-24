@@ -4,6 +4,7 @@
 #include "texas_hold_em.h"
 #include <unistd.h>
 #include <sys/wait.h>
+#include <stdio.h>
 #include <sys/types.h>
 #include <sys/select.h>
 #include <pthread.h>

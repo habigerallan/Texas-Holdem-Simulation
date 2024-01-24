@@ -9,12 +9,17 @@
 void* ThreadFunction(void *args) {
     // Unpack the thread argument which is the shared memory
     SharedData *shared_data = (SharedData *)args;
-
 	TexasHoldEm game;
-	while (atomic_load(&shared_data->current_iterations) < atomic_load(&shared_data->total_iterations)) {
+
+	int curr = atomic_load(&(shared_data->current_iterations));
+	int total = atomic_load(&(shared_data->total_iterations));
+
+	while (curr < total) {
         GameResult game_result = TexasHoldEm_play(&game);
         add_game_result(shared_data->hand_map, game_result);
-        atomic_fetch_add(&shared_data->current_iterations, 1);
+		printf("success: %d\n", curr);
+		atomic_fetch_add(&(shared_data->current_iterations), 1);
+		curr = atomic_load(&(shared_data->current_iterations));
     }
 
     return NULL;
@@ -32,19 +37,14 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    // Open shared memory in read/write mode
-    int shm_fd = shm_open("/mySharedMemory", O_RDWR, 0666);
-    if (shm_fd == -1) {
-        perror("shm_open");
-        exit(EXIT_FAILURE);
+	key_t key = ftok("somefile", 65); // Use the same key as in Program 1
+    int shm_id = shmget(key, sizeof(SharedData), 0666); // Connect to the shared memory segment
+	if (shm_id < 0) {
+        perror("shmget");
+        exit(1);
     }
 
-    // Map shared memory
-    SharedData *shared_data = mmap(NULL, sizeof(SharedData), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-    if (shared_data == MAP_FAILED) {
-        perror("mmap");
-        exit(EXIT_FAILURE);
-    }
+    SharedData *shared_data = (SharedData *) shmat(shm_id, (void*)0, 0);
 
     pthread_t threads[threads_per_process];
 
@@ -60,8 +60,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Clean up
-    munmap(shared_data, sizeof(SharedData));
-    close(shm_fd);
+    shmdt(shared_data);
 
     return EXIT_SUCCESS;
 }

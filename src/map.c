@@ -2,11 +2,21 @@
 
 HandMap init_card_data() {
 	HandMap hand_map;
-	Node **card_data;
-	
+    Node **card_data;
+
     card_data = malloc(52 * sizeof(Node *));
+    if (!card_data) {
+        perror("Failed to allocate memory for card_data");
+        exit(EXIT_FAILURE);
+    }
+	
     for (int i = 0; i < 52; i++) {
 		card_data[i] = malloc((52 - i) * sizeof(Node));
+        if (!card_data[i]) {
+            perror("Failed to allocate memory for card_data row");
+            exit(EXIT_FAILURE);
+        }
+
 		for (int j = 0; j < (52 - i); j++) {
             for (int k = 0; k < 10; k++) {
                 card_data[i][j].win_conditions[k] = 0;
@@ -52,7 +62,7 @@ NodeIndex hand_to_index(Hand hand) {
 	int suit2 = card2.suit - 1;
 
 	int card1_index = suit1 * 13 + rank1;
-	int card2_index = suit2 * 13 + rank2;
+	int card2_index = (suit2 * 13 + rank2) - card1_index;
 
 	NodeIndex index;
 	index.card1_index = card1_index;
@@ -91,13 +101,24 @@ void add_game_result(HandMap hand_map, GameResult game_result) {
 	NodeIndex index = hand_to_index(hand);
     int index1 = index.card1_index;
     int index2 = index.card2_index;
+	if (index1 < 0 || index1 >= 52) {
+        fprintf(stderr, "Index1 out of bounds: %d\n", index1);
+        return;
+    }
+	printf("1/3\n");
 
-	Node current_node = card_data[index1][index2];
+    if (!card_data[index1]) {
+        fprintf(stderr, "card_data[%d] is NULL\n", index1);
+        return;
+    }
+	printf("2/3\n");
+    Node *current_node_ptr = &card_data[index1][index2];
+	printf("3/3\n");
 
-	pthread_mutex_lock(&current_node.map_mutex);
-    current_node.win_conditions[win_condition]++;
-    current_node.hand_count++;
-    pthread_mutex_unlock(&current_node.map_mutex);
+	pthread_mutex_lock(&current_node_ptr->map_mutex);
+    current_node_ptr->win_conditions[win_condition]++;
+    current_node_ptr->hand_count++;
+    pthread_mutex_unlock(&current_node_ptr->map_mutex);
 }
 
 Node get_game_result(HandMap hand_map, NodeIndex index) {

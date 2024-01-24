@@ -1,45 +1,4 @@
 #include "main.h"
-#define PROGRESS_BAR_WIDTH 50 // Width of the progress bar in characters
-
-void* progressbar(void *args) {
-    SharedData *shared_data = (SharedData *)args;
-
-    // Initial print out of the progress bar
-    printf("[");
-    for (int i = 0; i < PROGRESS_BAR_WIDTH; i++) {
-        printf(" ");
-    }
-    printf("]\r["); // Carriage return to print over the same line
-
-    while (atomic_load(&shared_data->current_iterations) < atomic_load(&shared_data->total_iterations)) {
-        int current_progress = atomic_load(&shared_data->current_iterations);
-        int total = atomic_load(&shared_data->total_iterations);
-        int progress_percentage = (current_progress * 100) / total;
-        int pos = (progress_percentage * PROGRESS_BAR_WIDTH) / 100;
-
-        // Update the progress bar
-        for (int i = 0; i < pos; i++) {
-            printf("=");
-        }
-        for (int i = pos; i < PROGRESS_BAR_WIDTH; i++) {
-            printf(" ");
-        }
-        printf("] %d%%\r", progress_percentage); // Carriage return to print over the same line
-        fflush(stdout); // Flush the output buffer to ensure it prints immediately
-
-        // Sleep for a short interval so you don't update too frequently
-        usleep(100000); // Sleep for 100 milliseconds
-    }
-
-    // Final print out to ensure the progress bar shows as complete
-    printf("[");
-    for (int i = 0; i < PROGRESS_BAR_WIDTH; i++) {
-        printf("=");
-    }
-    printf("] 100%%\n"); // Newline at the end
-
-    return NULL;
-}
 
 void* ThreadFunction(void *args) {
     ThreadArgs *t_args = (ThreadArgs *) args;
@@ -88,12 +47,18 @@ int main(int argc, char *argv[]) {
     }
 
 	ThreadArgs args;
-	SharedData *shared_data;
-	
-	int shm_fd = shm_open("/mySharedMemory", O_CREAT | O_RDWR, 0666);
-    ftruncate(shm_fd, sizeof(SharedData));
-    shared_data = mmap(0, sizeof(SharedData), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-	
+
+	key_t key = ftok("somefile", 65); // Create a unique key. 'somefile' should be an existing file.
+    int shm_id = shmget(key, sizeof(SharedData), 0666|IPC_CREAT); // Create the shared memory segment
+
+    // Error checking
+    if (shm_id < 0) {
+        perror("shmget");
+        exit(1);
+    }
+
+	SharedData *shared_data = (SharedData *) shmat(shm_id, (void*)0, 0);
+
 	shared_data->hand_map = init_card_data();
     shared_data->total_iterations = total_iterations;
     shared_data->current_iterations = 0;
@@ -113,24 +78,32 @@ int main(int argc, char *argv[]) {
 		}
     }
 
-	pthread_t threadsasd;
-	if (pthread_create(&threadsasd, NULL, progressbar, (void *) &shared_data) != 0) {
-		perror("Failed to create thread");
-		exit(1);
-	}
-
 	for (int i = 0; i < threads_per_process; i++) {
         pthread_join(threads[i], NULL);
     }
 
-	pthread_join(threadsasd, NULL);
+	// TODO //
+	// print shared memory current iterations
+	int curr = shared_data->current_iterations;
+	int total = shared_data->total_iterations;
+	while (curr < total) {
+		printf("%d\n", curr);
+		sleep(1);
+		curr = shared_data->current_iterations;
+	}
 
-	// read handmap into some sort of file (maybe json **RESEARCH** )
+	if (shmdt(shared_data) == -1) {
+        perror("shmdt");
+        exit(1);
+    }
 
-	printf("Complete!");
+    // Mark the segment to be destroyed
+    if (shmctl(shm_id, IPC_RMID, NULL) == -1) {
+        perror("shmctl");
+        exit(1);
+    }
+
     munmap(shared_data, sizeof(SharedData));
-    close(shm_fd);
-    shm_unlink("/mySharedMemory");
 
 	return 0;
 }
