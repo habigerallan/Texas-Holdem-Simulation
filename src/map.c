@@ -43,6 +43,8 @@ void free_card_data(HandMap hand_map) {
     }
 
     free(hand_map.card_data);
+
+    hand_map.card_data = NULL;
 }
 
 NodeIndex hand_to_index(Hand hand) {
